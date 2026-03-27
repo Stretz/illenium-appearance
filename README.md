@@ -1,8 +1,7 @@
-# illenium-appearance
+# Illenium-appearance | Rework / Overhaul
 
 A replacement for clothing resources for various frameworks
 
-<div align='center'><h1><a href='https://docs.illenium.dev/free-resources/illenium-appearance/installation/'>Documentation</a></h3></div>
 <br>
 
 <img src="https://r2.fivemanage.com/m4VWZLZoULSXNOFGfRETN/Screenshot2026-03-27075003.png" alt="illenium-appearance with Tattoos" />
