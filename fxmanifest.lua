@@ -37,6 +37,7 @@ client_scripts {
   "client/stats.lua",
   "client/defaults.lua",
   "client/blips.lua",
+  "client/admin_stores.lua",
   "client/props.lua",
   "client/client.lua",
 }
@@ -50,6 +51,7 @@ server_scripts {
   "server/database/playeroutfits.lua",
   "server/database/players.lua",
   "server/database/playerskins.lua",
+  "server/database/stores.lua",
   "server/database/users.lua",
   "server/framework/qb/main.lua",
   "server/framework/qb/migrate.lua",

@@ -512,8 +512,17 @@ end
 if Config.EnableStoreAdminMenu then
     lib.addCommand("storeadmin", {
         help = "Open the appearance store admin menu",
-        restricted = Config.StoreAdminAce or "group.admin"
+        restricted = false
     }, function(source)
+        if not isStoreAdmin(source) then
+            notifyPlayer(source, {
+                title = "Store Admin",
+                description = "You do not have permission to use /storeadmin.",
+                type = "error",
+                position = Config.NotifyOptions.position
+            })
+            return
+        end
         TriggerClientEvent("illenium-appearance:client:openStoreAdminMenu", source)
     end)
 end

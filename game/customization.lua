@@ -384,6 +384,22 @@ function client.getConfig() return config end
 local isCameraInterpolating
 local currentCamera
 local cameraHandle
+local currentCameraFov = 49.0
+local cameraPanYOffset = 0.0
+local cameraBaseCoords
+local cameraBasePoint
+
+local function setCameraMatrix(baseCoords, basePoint)
+    cameraBaseCoords = vector3(baseCoords.x, baseCoords.y, baseCoords.z)
+    cameraBasePoint = vector3(basePoint.x, basePoint.y, basePoint.z)
+
+    if cameraHandle then
+        SetCamCoord(cameraHandle, cameraBaseCoords.x, cameraBaseCoords.y, cameraBaseCoords.z + cameraPanYOffset)
+        PointCamAtCoord(cameraHandle, cameraBasePoint.x, cameraBasePoint.y, cameraBasePoint.z + cameraPanYOffset)
+        SetCamFov(cameraHandle, currentCameraFov)
+    end
+end
+
 local function setCamera(key)
     if not isCameraInterpolating then
         if key ~= "current" then
@@ -396,9 +412,18 @@ local function setCamera(key)
         if cameraHandle then
             local camCoords = GetOffsetFromEntityInWorldCoords(cache.ped, coords.x * reverseFactor, coords.y * reverseFactor, coords.z * reverseFactor)
             local camPoint = GetOffsetFromEntityInWorldCoords(cache.ped, point.x, point.y, point.z)
-            local tmpCamera = CreateCameraWithParams("DEFAULT_SCRIPTED_CAMERA", camCoords.x, camCoords.y, camCoords.z, 0.0, 0.0, 0.0, 49.0, false, 0)
+            local tmpCamera = CreateCameraWithParams(
+                "DEFAULT_SCRIPTED_CAMERA",
+                camCoords.x,
+                camCoords.y,
+                camCoords.z + cameraPanYOffset,
+                0.0, 0.0, 0.0,
+                currentCameraFov,
+                false,
+                0
+            )
 
-            PointCamAtCoord(tmpCamera, camPoint.x, camPoint.y, camPoint.z)
+            PointCamAtCoord(tmpCamera, camPoint.x, camPoint.y, camPoint.z + cameraPanYOffset)
             SetCamActiveWithInterp(tmpCamera, cameraHandle, 1000, 1, 1)
 
             isCameraInterpolating = true
@@ -408,15 +433,26 @@ local function setCamera(key)
                 until not IsCamInterpolating(cameraHandle) and IsCamActive(tmpCamera)
                 DestroyCam(cameraHandle, false)
                 cameraHandle = tmpCamera
+                setCameraMatrix(camCoords, camPoint)
                 isCameraInterpolating = false
             end)
         else
             local camCoords = GetOffsetFromEntityInWorldCoords(cache.ped, coords.x, coords.y, coords.z)
             local camPoint = GetOffsetFromEntityInWorldCoords(cache.ped, point.x, point.y, point.z)
-            cameraHandle = CreateCameraWithParams("DEFAULT_SCRIPTED_CAMERA", camCoords.x, camCoords.y, camCoords.z, 0.0, 0.0, 0.0, 49.0, false, 0)
+            cameraHandle = CreateCameraWithParams(
+                "DEFAULT_SCRIPTED_CAMERA",
+                camCoords.x,
+                camCoords.y,
+                camCoords.z + cameraPanYOffset,
+                0.0, 0.0, 0.0,
+                currentCameraFov,
+                false,
+                0
+            )
 
-            PointCamAtCoord(cameraHandle, camPoint.x, camPoint.y, camPoint.z)
+            PointCamAtCoord(cameraHandle, camPoint.x, camPoint.y, camPoint.z + cameraPanYOffset)
             SetCamActive(cameraHandle, true)
+            setCameraMatrix(camCoords, camPoint)
         end
     end
 end
@@ -437,9 +473,18 @@ function client.rotateCamera(direction)
         )
 
         local camPoint = GetOffsetFromEntityInWorldCoords(cache.ped, point.x, point.y, point.z)
-        local tmpCamera = CreateCameraWithParams("DEFAULT_SCRIPTED_CAMERA", camCoords.x, camCoords.y, camCoords.z, 0.0, 0.0, 0.0, 49.0, false, 0)
+        local tmpCamera = CreateCameraWithParams(
+            "DEFAULT_SCRIPTED_CAMERA",
+            camCoords.x,
+            camCoords.y,
+            camCoords.z + cameraPanYOffset,
+            0.0, 0.0, 0.0,
+            currentCameraFov,
+            false,
+            0
+        )
 
-        PointCamAtCoord(tmpCamera, camPoint.x, camPoint.y, camPoint.z)
+        PointCamAtCoord(tmpCamera, camPoint.x, camPoint.y, camPoint.z + cameraPanYOffset)
         SetCamActiveWithInterp(tmpCamera, cameraHandle, 1000, 1, 1)
 
         isCameraInterpolating = true
@@ -449,8 +494,42 @@ function client.rotateCamera(direction)
             until not IsCamInterpolating(cameraHandle) and IsCamActive(tmpCamera)
             DestroyCam(cameraHandle, false)
             cameraHandle = tmpCamera
+            setCameraMatrix(camCoords, camPoint)
             isCameraInterpolating = false
         end)
+    end
+end
+
+local function clamp(value, min, max)
+    if value < min then return min end
+    if value > max then return max end
+    return value
+end
+
+function client.zoomCamera(step)
+    if not cameraHandle then return end
+
+    local zoomStep = tonumber(step) or 0.0
+    currentCameraFov = clamp(currentCameraFov + zoomStep, 20.0, 70.0)
+    SetCamFov(cameraHandle, currentCameraFov)
+end
+
+function client.rotatePed(deltaHeading)
+    local delta = tonumber(deltaHeading) or 0.0
+    if delta == 0.0 then return end
+    SetEntityHeading(cache.ped, GetEntityHeading(cache.ped) + delta)
+end
+
+function client.panCamera(step)
+    if not cameraHandle then return end
+    local panStep = tonumber(step) or 0.0
+    if panStep == 0.0 then return end
+
+    cameraPanYOffset = clamp(cameraPanYOffset + panStep, -1.2, 1.2)
+
+    if cameraBaseCoords and cameraBasePoint then
+        SetCamCoord(cameraHandle, cameraBaseCoords.x, cameraBaseCoords.y, cameraBaseCoords.z + cameraPanYOffset)
+        PointCamAtCoord(cameraHandle, cameraBasePoint.x, cameraBasePoint.y, cameraBasePoint.z + cameraPanYOffset)
     end
 end
 
@@ -547,6 +626,10 @@ function client.startPlayerCustomization(cb, conf)
     config = conf
     reverseCamera = false
     isCameraInterpolating = false
+    currentCameraFov = 49.0
+    cameraPanYOffset = 0.0
+    cameraBaseCoords = nil
+    cameraBasePoint = nil
 
     setCamera("default")
     SetNuiFocus(true, true)
@@ -600,6 +683,10 @@ function client.exitPlayerCustomization(appearance)
     currentCamera = nil
     reverseCamera = nil
     isCameraInterpolating = nil
+    currentCameraFov = 49.0
+    cameraPanYOffset = 0.0
+    cameraBaseCoords = nil
+    cameraBasePoint = nil
 
 end
 

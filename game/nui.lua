@@ -32,6 +32,23 @@ RegisterNUICallback("appearance_rotate_camera", function(direction, cb)
     client.rotateCamera(direction)
 end)
 
+RegisterNUICallback("appearance_zoom_camera", function(data, cb)
+    cb(1)
+    if not data then return end
+    client.zoomCamera(data.step)
+end)
+
+RegisterNUICallback("appearance_rotate_ped", function(deltaHeading, cb)
+    cb(1)
+    client.rotatePed(deltaHeading)
+end)
+
+RegisterNUICallback("appearance_pan_camera", function(data, cb)
+    cb(1)
+    if not data then return end
+    client.panCamera(data.step)
+end)
+
 RegisterNUICallback("appearance_change_model", function(model, cb)
     local playerPed = client.setPlayerModel(model)
 

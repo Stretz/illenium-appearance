@@ -347,27 +347,28 @@ const Appearance = () => {
       lastMouseX.current = e.clientX;
       lastMouseY.current = e.clientY;
 
-      dragAccumX.current += Math.abs(deltaX);
-      dragAccumY.current += Math.abs(deltaY);
-
-      // Lock a gesture mode after a small movement threshold.
       if (!dragGestureMode.current) {
-        const total = dragAccumX.current + dragAccumY.current;
-        if (total < 5) return;
-        dragGestureMode.current = dragAccumY.current > dragAccumX.current ? 'pan' : 'rotate';
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        if (absX < 0.5 && absY < 0.5) return;
+        dragGestureMode.current = absX >= absY ? 'rotate' : 'pan';
       }
 
-      if (dragGestureMode.current === 'pan') {
-        Nui.post('appearance_pan_camera', { step: -deltaY * 0.006 });
-        dragVelocity.current = 0;
+      if (dragGestureMode.current === 'rotate') {
+        const immediate = -deltaX * 4.2;
+        if (Math.abs(deltaX) > 0.1 && Math.abs(immediate) > 0.01) {
+          Nui.post('appearance_rotate_ped', immediate);
+        }
         return;
       }
 
-      const immediate = -deltaX * 5.2;
-      if (Math.abs(deltaX) > 0.2 && Math.abs(immediate) > 0.01) {
-        Nui.post('appearance_rotate_ped', immediate);
+      dragAccumY.current += deltaY;
+      const cameraStepThreshold = 14;
+      if (Math.abs(dragAccumY.current) >= cameraStepThreshold) {
+        const step = dragAccumY.current < 0 ? 0.06 : -0.06;
+        Nui.post('appearance_pan_camera', { step });
+        dragAccumY.current = 0;
       }
-      dragVelocity.current += -deltaX * 0.9;
     };
 
     const onMouseUp = () => {
@@ -377,29 +378,11 @@ const Appearance = () => {
       dragAccumY.current = 0;
     };
 
-    const tick = () => {
-      // Minimal residual smoothing only, no heavy inertia.
-      dragVelocity.current *= 0.55;
-      if (Math.abs(dragVelocity.current) > 0.01) {
-        Nui.post('appearance_rotate_ped', dragVelocity.current);
-      }
-      dragFrame.current = window.requestAnimationFrame(tick);
-    };
-
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-    dragFrame.current = window.requestAnimationFrame(tick);
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-      if (dragFrame.current) {
-        window.cancelAnimationFrame(dragFrame.current);
-        dragFrame.current = null;
-      }
-      dragVelocity.current = 0;
-      dragGestureMode.current = null;
-      dragAccumX.current = 0;
-      dragAccumY.current = 0;
     };
   }, [isDragging]);
 
