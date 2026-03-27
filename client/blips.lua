@@ -1,10 +1,51 @@
 local Blips = {}
 local client = client
 
+local function normalizeStores(stores)
+    local normalized = {}
+    for i = 1, #stores do
+        local s = stores[i]
+        local store = s
+        if type(s.type) == "string" then
+            store.type = s.type:lower()
+        end
+        if type(s.coords) == "table" then
+            store.coords = vector4(s.coords.x or 0.0, s.coords.y or 0.0, s.coords.z or 0.0, s.coords.w or s.rotation or 0.0)
+        end
+        if s.showBlip == nil and s.show_blip ~= nil then
+            store.showBlip = s.show_blip == true or s.show_blip == 1 or s.show_blip == "1"
+        elseif s.showBlip ~= nil then
+            store.showBlip = s.showBlip == true or s.showBlip == 1 or s.showBlip == "1"
+        end
+        normalized[#normalized + 1] = store
+    end
+    return normalized
+end
+
+CreateThread(function()
+    local stores = lib.callback.await("illenium-appearance:server:getStores", false)
+    if stores then
+        Config.Stores = normalizeStores(stores)
+        ResetBlips()
+    end
+end)
+
 local function ShowBlip(blipConfig, blip)
-    if blip.job and blip.job ~= client.job.name then
+    if not blipConfig then
         return false
-    elseif blip.gang and blip.gang ~= client.gang.name then
+    end
+
+    if blip.dynamic and blip.showBlip == false then
+        return false
+    end
+
+    if blip.dynamic then
+        return blip.showBlip ~= false
+    end
+
+    if blip.job and blip.job ~= "" and blip.job ~= client.job.name then
+        return false
+    elseif blip.gang and blip.gang ~= "" and blip.gang ~= client.gang.name then
         return false
     end
 
@@ -30,7 +71,7 @@ end
 local function SetupBlips()
     for k, _ in pairs(Config.Stores) do
         local blipConfig = Config.Blips[Config.Stores[k].type]
-        if ShowBlip(blipConfig, Config.Stores[k]) then
+        if blipConfig and ShowBlip(blipConfig, Config.Stores[k]) then
             local blip = CreateBlip(blipConfig, Config.Stores[k].coords)
             Blips[#Blips + 1] = blip
         end
@@ -83,3 +124,13 @@ end
 if Config.ShowNearestShopOnly then
     CreateThread(ShowNearestShopBlip)
 end
+
+RegisterNetEvent("illenium-appearance:client:syncStores", function(stores)
+    if not stores then return end
+    Config.Stores = normalizeStores(stores)
+    ResetBlips()
+    CreateThread(function()
+        Wait(500)
+        ResetBlips()
+    end)
+end)

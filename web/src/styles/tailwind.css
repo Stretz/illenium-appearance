@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Nexa-Book';
+  src: url('../fonts/Nexa-Book.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@layer base {
+  :root {
+    --fontColor: 193, 194, 197;
+    --mutedTextColor: 144, 146, 150;
+    --mutedTextColorSoft: 92, 95, 102;
+    --primaryBackground: 16, 18, 30;
+    --secondaryBackground: 10, 12, 22;
+    --surfaceBackground: 31, 34, 52;
+    --surfaceBackgroundAlt: 24, 26, 40;
+    --primaryBackgroundSelected: 58, 63, 89;
+    --borderColor: 138, 152, 217;
+    --borderColorSoft: 109, 125, 191;
+    --accentColor: 124, 170, 255;
+    --accentColorHover: 154, 196, 255;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    outline: 0;
+    user-select: none;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+  }
+
+  body {
+    font-family: 'Nexa-Book', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+    color: rgb(var(--fontColor));
+    position: relative;
+    background: transparent;
+    background-color: transparent;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: none;
+    z-index: -1;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: none;
+    z-index: -1;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    border: 1px solid rgba(var(--borderColor), 0.3);
+    background: linear-gradient(
+      165deg,
+      rgba(var(--primaryBackground), 0.84),
+      rgba(var(--surfaceBackgroundAlt), 0.76)
+    );
+    box-shadow:
+      0 18px 46px rgba(0, 0, 0, 0.52),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    border-radius: 18px;
+  }
+
+  .glass-card {
+    border: 1px solid rgba(var(--borderColor), 0.26);
+    background: linear-gradient(
+      160deg,
+      rgba(var(--surfaceBackground), 0.52),
+      rgba(var(--surfaceBackgroundAlt), 0.34)
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 6px 18px rgba(0, 0, 0, 0.2);
+    border-radius: 14px;
+  }
+
+  .premium-title {
+    color: rgb(var(--fontColor));
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .premium-label {
+    color: rgb(var(--mutedTextColor));
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+  }
+
+  .btn-primary-premium {
+    border: 1px solid rgba(var(--accentColor), 0.9);
+    background: linear-gradient(135deg, rgba(211, 183, 132, 0.9), rgba(173, 139, 85, 0.92));
+    color: #17120a;
+    box-shadow: 0 8px 20px rgba(156, 120, 63, 0.35);
+  }
+
+  .btn-primary-premium:hover {
+    background: linear-gradient(135deg, rgba(228, 199, 148, 0.95), rgba(184, 150, 97, 0.95));
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary-premium {
+    border: 1px solid rgba(var(--borderColorSoft), 0.52);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgb(var(--fontColor));
+  }
+
+  .btn-secondary-premium:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(210, 180, 130, 0.55);
+    color: rgb(var(--accentColorHover));
+  }
+}

@@ -1,5 +1,118 @@
 local outfitCache = {}
 local uniformCache = {}
+local runtimeStores = {}
+
+do
+    local originalServerNotify = lib.notify
+    lib.notify = function(target, payload, ...)
+        if Config.MenuSystem == "internal" and type(target) == "number" and type(payload) == "table" then
+            TriggerClientEvent("illenium-appearance:client:internalNotify", target, payload)
+            return true
+        end
+        return originalServerNotify(target, payload, ...)
+    end
+end
+
+local function isStoreAdmin(source)
+    if source == 0 then return true end
+    local storeAce = Config.StoreAdminAce
+    local pedAce = Config.PedMenuGroup
+    if IsPlayerAceAllowed(source, "command.storeadmin") then
+        return true
+    end
+    if storeAce and IsPlayerAceAllowed(source, storeAce) then
+        return true
+    end
+    if storeAce and storeAce:sub(1, 6) == "group." then
+        local short = storeAce:sub(7)
+        if short ~= "" and IsPlayerAceAllowed(source, short) then
+            return true
+        end
+    end
+    if pedAce and IsPlayerAceAllowed(source, pedAce) then
+        return true
+    end
+    if pedAce and pedAce:sub(1, 6) == "group." then
+        local short = pedAce:sub(7)
+        if short ~= "" and IsPlayerAceAllowed(source, short) then
+            return true
+        end
+    end
+    return false
+end
+
+local function decodeStoreRow(row)
+    local function toBool(value)
+        if value == nil then return nil end
+        if value == true or value == 1 or value == "1" then return true end
+        if value == false or value == 0 or value == "0" then return false end
+        return nil
+    end
+
+    local function normalizeOptionalText(value)
+        if type(value) ~= "string" then
+            return nil
+        end
+        value = value:gsub("^%s+", ""):gsub("%s+$", "")
+        if value == "" then
+            return nil
+        end
+        return value
+    end
+
+    return {
+        id = row.id,
+        type = type(row.type) == "string" and row.type:lower() or row.type,
+        job = normalizeOptionalText(row.job),
+        gang = normalizeOptionalText(row.gang),
+        usePoly = toBool(row.use_poly) == true,
+        showBlip = toBool(row.show_blip),
+        coords = json.decode(row.coords or "{}"),
+        size = row.size and json.decode(row.size) or nil,
+        rotation = row.rotation or 0.0,
+        points = row.points and json.decode(row.points) or nil,
+        targetModel = row.target_model,
+        targetScenario = row.target_scenario,
+        dynamic = true
+    }
+end
+
+local function loadRuntimeStores()
+    Database.Stores.Init()
+    local rows = Database.Stores.GetAll()
+    runtimeStores = {}
+    for i = 1, #rows do
+        runtimeStores[#runtimeStores + 1] = decodeStoreRow(rows[i])
+    end
+end
+
+local function getMergedStores()
+    local merged = {}
+    for i = 1, #Config.Stores do
+        merged[#merged + 1] = Config.Stores[i]
+    end
+    for i = 1, #runtimeStores do
+        merged[#merged + 1] = runtimeStores[i]
+    end
+    return merged
+end
+
+local function syncStoresToClients(target)
+    local stores = getMergedStores()
+    if target then
+        TriggerClientEvent("illenium-appearance:client:syncStores", target, stores)
+        return
+    end
+    TriggerClientEvent("illenium-appearance:client:syncStores", -1, stores)
+end
+
+local function notifyPlayer(source, payload)
+    if Config.MenuSystem == "internal" then
+        TriggerClientEvent("illenium-appearance:client:internalNotify", source, payload)
+    else
+        lib.notify(source, payload)
+    end
+end
 
 local function getMoneyForShop(shopType)
     local money = 0
@@ -162,6 +275,17 @@ lib.callback.register("illenium-appearance:server:getUniform", function(source)
     return uniformCache[Framework.GetPlayerID(source)]
 end)
 
+lib.callback.register("illenium-appearance:server:getStores", function()
+    return getMergedStores()
+end)
+
+lib.callback.register("illenium-appearance:server:getDynamicStores", function(source)
+    if not isStoreAdmin(source) then
+        return {}
+    end
+    return runtimeStores
+end)
+
 RegisterServerEvent("illenium-appearance:server:saveAppearance", function(appearance)
     local src = source
     local citizenID = Framework.GetPlayerID(src)
@@ -301,6 +425,58 @@ RegisterNetEvent("illenium-appearance:server:ResetRoutingBucket", function()
     SetPlayerRoutingBucket(src, 0)
 end)
 
+RegisterNetEvent("illenium-appearance:server:addStore", function(storeData)
+    local src = source
+    if not isStoreAdmin(src) then return end
+    if not storeData or not storeData.type or not storeData.coords then return end
+
+    local id = Database.Stores.Add(storeData)
+    if not id then return end
+    loadRuntimeStores()
+    syncStoresToClients()
+
+    notifyPlayer(src, {
+        title = "Store Admin",
+        description = "Store location created.",
+        type = "success",
+        position = Config.NotifyOptions.position
+    })
+end)
+
+RegisterNetEvent("illenium-appearance:server:updateStore", function(storeID, storeData)
+    local src = source
+    if not isStoreAdmin(src) then return end
+    if not storeID or not storeData then return end
+
+    Database.Stores.Update(storeID, storeData)
+    loadRuntimeStores()
+    syncStoresToClients()
+
+    notifyPlayer(src, {
+        title = "Store Admin",
+        description = "Store location updated.",
+        type = "success",
+        position = Config.NotifyOptions.position
+    })
+end)
+
+RegisterNetEvent("illenium-appearance:server:deleteStore", function(storeID)
+    local src = source
+    if not isStoreAdmin(src) then return end
+    if not storeID then return end
+
+    Database.Stores.DeleteByID(storeID)
+    loadRuntimeStores()
+    syncStoresToClients()
+
+    notifyPlayer(src, {
+        title = "Store Admin",
+        description = "Store location deleted.",
+        type = "success",
+        position = Config.NotifyOptions.position
+    })
+end)
+
 if Config.EnablePedMenu then
     lib.addCommand("pedmenu", {
         help = _L("commands.pedmenu.title"),
@@ -333,6 +509,15 @@ if Config.EnablePedMenu then
     end)
 end
 
+if Config.EnableStoreAdminMenu then
+    lib.addCommand("storeadmin", {
+        help = "Open the appearance store admin menu",
+        restricted = Config.StoreAdminAce or "group.admin"
+    }, function(source)
+        TriggerClientEvent("illenium-appearance:client:openStoreAdminMenu", source)
+    end)
+end
+
 if Config.EnableJobOutfitsCommand then
     lib.addCommand("joboutfits", { help = _L("commands.joboutfits.title"), }, function(source)
         TriggerClientEvent("illenium-apearance:client:outfitsCommand", source, true)
@@ -349,6 +534,18 @@ end)
 
 lib.addCommand("clearstuckprops", { help = _L("commands.clearstuckprops.title") }, function(source)
     TriggerClientEvent("illenium-appearance:client:ClearStuckProps", source)
+end)
+
+CreateThread(function()
+    loadRuntimeStores()
+    Wait(1500)
+    syncStoresToClients()
+end)
+
+AddEventHandler("playerJoining", function()
+    local src = source
+    Wait(2500)
+    syncStoresToClients(src)
 end)
 
 lib.versionCheck("iLLeniumStudios/illenium-appearance")

@@ -2,11 +2,63 @@ if Config.UseTarget then return end
 
 local currentZone = nil
 
+local function shouldUseInternalTextUI()
+    return Config.MenuSystem == "internal"
+end
+
+local function showZoneTextUI(text)
+    if shouldUseInternalTextUI() then
+        SendNuiMessage(json.encode({
+            type = "internal_textui_show",
+            payload = {
+                text = text
+            }
+        }))
+        return
+    end
+    lib.showTextUI(text, Config.TextUIOptions)
+end
+
+local function hideZoneTextUI()
+    if shouldUseInternalTextUI() then
+        SendNuiMessage(json.encode({
+            type = "internal_textui_hide",
+            payload = {}
+        }))
+        return
+    end
+    lib.hideTextUI()
+end
+
 local Zones = {
     Store = {},
     ClothingRoom = {},
     PlayerOutfitRoom = {}
 }
+
+local function normalizeStores(stores)
+    local normalized = {}
+    for i = 1, #stores do
+        local s = stores[i]
+        local store = s
+        if type(s.coords) == "table" then
+            store.coords = vector4(s.coords.x or 0.0, s.coords.y or 0.0, s.coords.z or 0.0, s.coords.w or s.rotation or 0.0)
+        end
+        if type(s.size) == "table" then
+            store.size = vector3(s.size.x or 4.0, s.size.y or 4.0, s.size.z or 4.0)
+        end
+        if type(s.points) == "table" then
+            local points = {}
+            for p = 1, #s.points do
+                local pt = s.points[p]
+                points[#points + 1] = vector3(pt.x or 0.0, pt.y or 0.0, pt.z or 0.0)
+            end
+            store.points = points
+        end
+        normalized[#normalized + 1] = store
+    end
+    return normalized
+end
 
 local function RemoveZones()
     for i = 1, #Zones.Store do
@@ -42,13 +94,13 @@ local function onStoreEnter(data)
         }
         local prefix = Config.UseRadialMenu and "" or "[E] "
         if currentZone.name == "clothing" then
-            lib.showTextUI(prefix .. string.format(_L("textUI.clothing"), Config.ClothingCost), Config.TextUIOptions)
+            showZoneTextUI(prefix .. string.format(_L("textUI.clothing"), Config.ClothingCost))
         elseif currentZone.name == "barber" then
-            lib.showTextUI(prefix .. string.format(_L("textUI.barber"), Config.BarberCost), Config.TextUIOptions)
+            showZoneTextUI(prefix .. string.format(_L("textUI.barber"), Config.BarberCost))
         elseif currentZone.name == "tattoo" then
-            lib.showTextUI(prefix .. string.format(_L("textUI.tattoo"), Config.TattooCost), Config.TextUIOptions)
+            showZoneTextUI(prefix .. string.format(_L("textUI.tattoo"), Config.TattooCost))
         elseif currentZone.name == "surgeon" then
-            lib.showTextUI(prefix .. string.format(_L("textUI.surgeon"), Config.SurgeonCost), Config.TextUIOptions)
+            showZoneTextUI(prefix .. string.format(_L("textUI.surgeon"), Config.SurgeonCost))
         end
         Radial.AddOption(currentZone)
     end
@@ -66,7 +118,7 @@ local function onClothingRoomEnter(data)
                 index = index
             }
             local prefix = Config.UseRadialMenu and "" or "[E] "
-            lib.showTextUI(prefix .. _L("textUI.clothingRoom"), Config.TextUIOptions)
+            showZoneTextUI(prefix .. _L("textUI.clothingRoom"))
             Radial.AddOption(currentZone)
         end
     end
@@ -83,7 +135,7 @@ local function onPlayerOutfitRoomEnter(data)
             index = index
         }
         local prefix = Config.UseRadialMenu and "" or "[E] "
-        lib.showTextUI(prefix .. _L("textUI.playerOutfitRoom"), Config.TextUIOptions)
+        showZoneTextUI(prefix .. _L("textUI.playerOutfitRoom"))
         Radial.AddOption(currentZone)
     end
 end
@@ -91,7 +143,7 @@ end
 local function onZoneExit()
     currentZone = nil
     Radial.RemoveOption()
-    lib.hideTextUI()
+    hideZoneTextUI()
 end
 
 local function SetupZone(store, onEnter, onExit)
@@ -142,6 +194,17 @@ local function SetupZones()
     SetupPlayerOutfitRoomZones()
 end
 
+local function RefreshZones()
+    RemoveZones()
+    Zones.Store = {}
+    Zones.ClothingRoom = {}
+    Zones.PlayerOutfitRoom = {}
+    currentZone = nil
+    hideZoneTextUI()
+    Radial.RemoveOption()
+    SetupZones()
+end
+
 local function ZonesLoop()
     Wait(1000)
     while true do
@@ -173,6 +236,10 @@ end
 
 
 CreateThread(function()
+    local stores = lib.callback.await("illenium-appearance:server:getStores", false)
+    if stores then
+        Config.Stores = normalizeStores(stores)
+    end
     SetupZones()
     if not Config.UseRadialMenu then
         ZonesLoop()
@@ -194,4 +261,11 @@ end)
 RegisterNetEvent("illenium-appearance:client:OpenPlayerOutfitRoom", function()
     local outfitRoom = Config.PlayerOutfitRooms[currentZone.index]
     OpenOutfitRoom(outfitRoom)
+end)
+
+RegisterNetEvent("illenium-appearance:client:syncStores", function(stores)
+    if not stores then return end
+    Config.Stores = normalizeStores(stores)
+    RefreshZones()
+    ResetBlips()
 end)

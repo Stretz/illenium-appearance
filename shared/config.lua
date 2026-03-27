@@ -28,6 +28,10 @@ Config.OutfitCodeLength = 10
 
 Config.UseRadialMenu = false
 Config.UseOxRadial = false -- Set to true to use ox_lib radial menu, both this and UseRadialMenu must be true 
+Config.MenuSystem = "internal" -- "ox_lib" or "internal" for clothing/outfit option menus
+
+Config.EnableStoreAdminMenu = true
+Config.StoreAdminAce = "group.admin" -- ace required for /storeadmin and store edits
 
 Config.EnablePedsForShops = true
 Config.EnablePedsForClothingRooms = true
@@ -100,30 +104,30 @@ Config.Aces = {} -- list of ace permissions used for blacklisting
 Config.Blips = {
     ["clothing"] = {
         Show = true,
-        Sprite = 366,
+        Sprite = 73,
         Color = 47,
-        Scale = 0.7,
+        Scale = 0.6,
         Name = "Clothing Store",
     },
     ["barber"] = {
         Show = true,
         Sprite = 71,
         Color = 0,
-        Scale = 0.7,
+        Scale = 0.6,
         Name = "Barber",
     },
     ["tattoo"] = {
         Show = true,
         Sprite = 75,
         Color = 4,
-        Scale = 0.7,
+        Scale = 0.6,
         Name = "Tattoo Shop",
     },
     ["surgeon"] = {
         Show = true,
         Sprite = 102,
         Color = 4,
-        Scale = 0.7,
+        Scale = 0.6,
         Name = "Plastic Surgeon",
     }
 }
@@ -346,19 +350,19 @@ Config.Stores = {
             vector3(-1093.1976318359, 2709.7365722656, 19.11)
         }
     },
-    {
-        type = "clothing",
-        coords = vector4(-1119.24, -1440.6, 5.23, 300.5),
-        size = vector3(4, 4, 4),
-        rotation = 45,
-        usePoly = false,
-        points = {
-            vector3(-1124.5535888672, -1444.5367431641, 5.23),
-            vector3(-1118.7023925781, -1441.0450439453, 5.23),
-            vector3(-1121.2891845703, -1434.8474121094, 5.23),
-            vector3(-1128.4727783203, -1439.8254394531, 5.23)
-        }
-    },
+    -- {
+    --     type = "clothing",
+    --     coords = vector4(-1119.24, -1440.6, 5.23, 300.5),
+    --     size = vector3(4, 4, 4),
+    --     rotation = 45,
+    --     usePoly = false,
+    --     points = {
+    --         vector3(-1124.5535888672, -1444.5367431641, 5.23),
+    --         vector3(-1118.7023925781, -1441.0450439453, 5.23),
+    --         vector3(-1121.2891845703, -1434.8474121094, 5.23),
+    --         vector3(-1128.4727783203, -1439.8254394531, 5.23)
+    --     }
+    -- },
     {
         type = "clothing",
         coords = vector4(124.82, -224.36, 54.56, 335.41),
@@ -560,42 +564,49 @@ Config.Stores = {
 Config.ClothingRooms = {
     {
         job = "police",
-        coords = vector4(454.91, -990.89, 30.69, 193.4),
+        coords = vector4(462.07, -998.98, 30.69, 13.83),
         size = vector3(4, 4, 4),
         rotation = 45,
         usePoly = false,
         points = {
-            vector3(460.41918945312, -993.11444091797, 30.69),
-            vector3(449.39508056641, -993.60614013672, 30.69),
-            vector3(449.88696289062, -990.23779296875, 30.69),
-            vector3(450.97882080078, -989.71411132812, 30.69),
-            vector3(451.0325012207, -987.89904785156, 30.69),
-            vector3(453.47863769531, -987.76928710938, 30.69),
-            vector3(454.35513305664, -988.46459960938, 30.69),
-            vector3(460.4231262207, -987.94573974609, 30.69)
+            vector3(458.85, -999.61, 30.69),
+            vector3(458.75, -997.97, 30.69),
+            vector3(463.89, -997.79, 30.69),
+            vector3(463.91, -999.65, 30.69)
         }
-    }
+    },
+    --  {
+    --     job = "eastcustoms",
+    --     coords = vector4(883.04, -2102.62, 30.46, 352.1),
+    --     size = vector3(4, 4, 4),
+    --     rotation = 45,
+    --     usePoly = false,
+    --     points = {
+    --         vector3(883.88, -2100.6, 30.46),
+    --         vector3(881.4, -2100.45, 30.46),
+    --         vector3(881.06, -2104.23, 30.46),
+    --         vector3(883.54, -2104.54, 30.46),
+    --     }
+    -- },
+    {
+        job = "hayes",
+        coords = vector4(-1424.48, -457.09, 36.36, 301.78),
+        size = vector3(4, 4, 4),
+        rotation = 45,
+        usePoly = false,
+        points = {
+            vector3(-1424.61, -458.23, 35.91),
+            vector3(-1425.66, -456.52, 35.91),
+            vector3(-1423.86, -455.55, 35.91),
+            vector3(-1423.8, -457.79, 36.35),
+        }
+    },
 }
 
 
 Config.PlayerOutfitRooms = {
-    -- Sample outfit room config
---[[    {
-        job = "police",
-        coords = vector4(287.28, -573.41, 43.16, 79.61),
-        size = vector3(4, 4, 4),
-        rotation = 45,
-        usePoly = false,
-        points = {
-            vector3(284.83, -574.01, 43.16),
-            vector3(286.33, -570.03, 43.16),
-            vector3(290.33, -571.74, 43.16),
-            vector3(289.0, -574.75, 43.16)
-        },
-        citizenIDs = {
-            "BHH65156"
-        }
-    }]]--
+    
+   
 }
 
 Config.Outfits = {
@@ -771,47 +782,6 @@ Config.Outfits = {
                     ["mask"] = {item = 35, texture = 0} -- Mask
                 },
                 grades = {3, 4},
-            }
-        }
-    },
-    ["realestate"] = {
-        ["Male"] = {
-            {
-                -- Outfits
-                name = "Worker",
-                outfitData = {
-                    ["pants"]       = { item = 28, texture = 0},  -- Pants
-                    ["arms"]        = { item = 1, texture = 0},  -- Arms
-                    ["t-shirt"]     = { item = 31, texture = 0},  -- T Shirt
-                    ["vest"]        = { item = 0, texture = 0},  -- Body Vest
-                    ["torso2"]      = { item = 294, texture = 0},  -- Jacket
-                    ["shoes"]       = { item = 10, texture = 0},  -- Shoes
-                    ["accessory"]   = { item = 0, texture = 0},  -- Neck Accessory
-                    ["bag"]         = { item = 0, texture = 0},  -- Bag
-                    ["hat"]         = { item = 12, texture = -1},  -- Hat
-                    ["glass"]       = { item = 0, texture = 0},  -- Glasses
-                    ["mask"]        = { item = 0, texture = 0},  -- Mask
-                },
-                grades = {0, 1, 2, 3, 4},
-            }
-        },
-        ["Female"] = {
-            {
-                name = "Worker",
-                outfitData = {
-                    ["pants"]       = { item = 57, texture = 2},  -- Pants
-                    ["arms"]        = { item = 0, texture = 0},  -- Arms
-                    ["t-shirt"]     = { item = 34, texture = 0},  -- T Shirt
-                    ["vest"]        = { item = 0, texture = 0},  -- Body Vest
-                    ["torso2"]      = { item = 105, texture = 7},  -- Jacket
-                    ["shoes"]       = { item = 8, texture = 5},  -- Shoes
-                    ["accessory"]   = { item = 11, texture = 3},  -- Neck Accessory
-                    ["bag"]         = { item = 0, texture = 0},  -- Bag
-                    ["hat"]         = { item = -1, texture = -1},  -- Hat
-                    ["glass"]       = { item = 0, texture = 0},  -- Glasses
-                    ["mask"]        = { item = 0, texture = 0},  -- Mask
-                },
-                grades = {0, 1, 2, 3, 4},
             }
         }
     },

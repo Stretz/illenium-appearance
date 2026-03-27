@@ -1,5 +1,324 @@
 local client = client
 local reloadSkinTimer = GetGameTimer()
+local internalMenuVisible = false
+local internalMenuRegistry = {}
+
+local function shouldUseInternalMenu()
+    return Config.MenuSystem == "internal"
+end
+
+local function showInternalNotify(payload)
+    if not payload then return end
+    SendNuiMessage(json.encode({
+        type = "internal_notify_show",
+        payload = payload
+    }))
+end
+
+do
+    local originalClientNotify = lib.notify
+    lib.notify = function(payload, ...)
+        if shouldUseInternalMenu() and type(payload) == "table" then
+            showInternalNotify(payload)
+            return true
+        end
+        return originalClientNotify(payload, ...)
+    end
+end
+
+local function closeInternalMenu()
+    if not internalMenuVisible then return end
+    internalMenuVisible = false
+    internalMenuRegistry = {}
+    SetNuiFocus(false, false)
+    SendNuiMessage(json.encode({
+        type = "internal_menu_close",
+        payload = {}
+    }))
+end
+
+RegisterNUICallback("internal_menu_close", function(_, cb)
+    closeInternalMenu()
+    cb(1)
+end)
+
+RegisterNetEvent("illenium-appearance:client:internalNotify", function(payload)
+    if not shouldUseInternalMenu() then return end
+    showInternalNotify(payload)
+end)
+
+RegisterNUICallback("internal_menu_select", function(data, cb)
+    cb(1)
+    closeInternalMenu()
+
+    if not data or not data.event then return end
+
+    if data.args ~= nil then
+        TriggerEvent(data.event, data.args)
+    else
+        TriggerEvent(data.event)
+    end
+end)
+
+local function openInternalMenu(startMenuId, menuRegistry)
+    internalMenuVisible = true
+    internalMenuRegistry = menuRegistry or {}
+    SetNuiFocus(true, true)
+
+    SendNuiMessage(json.encode({
+        type = "internal_menu_open",
+        payload = {
+            startMenuId = startMenuId,
+            menus = internalMenuRegistry
+        }
+    }))
+end
+
+RegisterNetEvent("illenium-appearance:client:openInternalMenu", function(data)
+    if not shouldUseInternalMenu() then return end
+    if not data or not data.startMenuId or not data.menus then return end
+    openInternalMenu(data.startMenuId, data.menus)
+end)
+
+local function openInternalImportForm()
+    internalMenuVisible = true
+    SetNuiFocus(true, true)
+    SendNuiMessage(json.encode({
+        type = "internal_menu_open_import_form",
+        payload = {
+            title = _L("outfits.import.title"),
+            nameLabel = _L("outfits.import.name.label"),
+            namePlaceholder = _L("outfits.import.name.placeholder"),
+            nameDefault = _L("outfits.import.name.default"),
+            codeLabel = _L("outfits.import.code.label"),
+            codePlaceholder = "XXXXXXXXXXXX",
+            submitLabel = _L("outfits.import.menuTitle"),
+            cancelLabel = "Cancel",
+            submitEvent = "internal_menu_import_submit"
+        }
+    }))
+end
+
+local function openInternalSaveForm()
+    internalMenuVisible = true
+    SetNuiFocus(true, true)
+    SendNuiMessage(json.encode({
+        type = "internal_menu_open_import_form",
+        payload = {
+            title = _L("outfits.save.title"),
+            nameLabel = _L("outfits.save.name.label"),
+            namePlaceholder = _L("outfits.save.name.placeholder"),
+            nameDefault = "",
+            submitLabel = _L("outfits.save.menuTitle"),
+            cancelLabel = "Cancel",
+            submitEvent = "internal_menu_save_submit"
+        }
+    }))
+end
+
+local function openInternalGeneratedCodeForm(code)
+    internalMenuVisible = true
+    SetNuiFocus(true, true)
+    SendNuiMessage(json.encode({
+        type = "internal_menu_open_generated_code",
+        payload = {
+            title = _L("outfits.generate.success.title"),
+            codeLabel = _L("outfits.generate.success.description"),
+            code = code,
+            cancelLabel = "Close",
+            submitLabel = "Copy"
+        }
+    }))
+end
+
+RegisterNUICallback("internal_menu_import_submit", function(data, cb)
+    if not data or not data.outfitCode or data.outfitCode == "" then
+        cb({ success = false, reason = "missing_code" })
+        return
+    end
+
+    local outfitName = data.outfitName or _L("outfits.import.name.default")
+    local outfitCode = data.outfitCode
+
+    Wait(500)
+    lib.callback("illenium-appearance:server:importOutfitCode", false, function(success)
+        cb({ success = success })
+        if success then
+            lib.notify({
+                title = _L("outfits.import.success.title"),
+                description = _L("outfits.import.success.description"),
+                type = "success",
+                position = Config.NotifyOptions.position
+            })
+        else
+            lib.notify({
+                title = _L("outfits.import.failure.title"),
+                description = _L("outfits.import.failure.description"),
+                type = "error",
+                position = Config.NotifyOptions.position
+            })
+        end
+    end, outfitName, outfitCode)
+end)
+
+RegisterNUICallback("internal_menu_save_submit", function(data, cb)
+    local outfitName = data and data.outfitName
+    if not outfitName or outfitName == "" then
+        cb({ success = false, reason = "missing_name" })
+        return
+    end
+
+    Wait(500)
+    lib.callback("illenium-appearance:server:getOutfits", false, function(outfits)
+        local outfitExists = false
+        for i = 1, #outfits, 1 do
+            if outfits[i].name:lower() == outfitName:lower() then
+                outfitExists = true
+                break
+            end
+        end
+
+        if outfitExists then
+            cb({ success = false, reason = "duplicate" })
+            lib.notify({
+                title = _L("outfits.save.failure.title"),
+                description = _L("outfits.save.failure.description"),
+                type = "error",
+                position = Config.NotifyOptions.position
+            })
+            return
+        end
+
+        local pedModel = client.getPedModel(cache.ped)
+        local pedComponents = client.getPedComponents(cache.ped)
+        local pedProps = client.getPedProps(cache.ped)
+
+        TriggerServerEvent("illenium-appearance:server:saveOutfit", outfitName, pedModel, pedComponents, pedProps)
+        cb({ success = true })
+    end)
+end)
+
+RegisterNUICallback("internal_menu_generated_code_action", function(data, cb)
+    if data and data.action == "copy" and data.code then
+        lib.setClipboard(data.code)
+        cb({ success = true })
+        return
+    end
+
+    cb({ success = true })
+end)
+
+RegisterNUICallback("internal_menu_generate_code", function(data, cb)
+    local id = data and data.id
+    if not id then
+        cb({ success = false, reason = "missing_id" })
+        return
+    end
+
+    lib.callback("illenium-appearance:server:generateOutfitCode", false, function(code)
+        if not code then
+            lib.notify({
+                title = _L("outfits.generate.failure.title"),
+                description = _L("outfits.generate.failure.description"),
+                type = "error",
+                position = Config.NotifyOptions.position
+            })
+            cb({ success = false, reason = "generate_failed" })
+            return
+        end
+
+        cb({ success = true, code = code })
+    end, id)
+end)
+
+RegisterNUICallback("internal_menu_get_player_transform", function(_, cb)
+    local coords = GetEntityCoords(cache.ped)
+    local heading = GetEntityHeading(cache.ped)
+    cb({
+        success = true,
+        coords = {
+            x = coords.x,
+            y = coords.y,
+            z = coords.z,
+        },
+        heading = heading
+    })
+end)
+
+RegisterNUICallback("internal_menu_store_create_submit", function(data, cb)
+    local function sanitizeOptionalText(value)
+        if type(value) ~= "string" then
+            return nil
+        end
+        value = value:gsub("^%s+", ""):gsub("%s+$", "")
+        if value == "" then
+            return nil
+        end
+        return value
+    end
+
+    if not data then
+        cb({ success = false, reason = "missing_data" })
+        return
+    end
+
+    if not data.type or data.type == "" then
+        cb({ success = false, reason = "missing_type" })
+        return
+    end
+
+    TriggerServerEvent("illenium-appearance:server:addStore", {
+        type = data.type,
+        rotation = tonumber(data.rotation) or 0.0,
+        coords = data.coords,
+        size = data.size,
+        usePoly = false,
+        showBlip = data.showBlip == true,
+        job = sanitizeOptionalText(data.job),
+        gang = sanitizeOptionalText(data.gang)
+    })
+    cb({ success = true })
+end)
+
+RegisterNUICallback("internal_menu_store_update_submit", function(data, cb)
+    local function sanitizeOptionalText(value)
+        if type(value) ~= "string" then
+            return nil
+        end
+        value = value:gsub("^%s+", ""):gsub("%s+$", "")
+        if value == "" then
+            return nil
+        end
+        return value
+    end
+
+    if not data or not data.id then
+        cb({ success = false, reason = "missing_id" })
+        return
+    end
+
+    TriggerServerEvent("illenium-appearance:server:updateStore", data.id, {
+        type = data.type,
+        rotation = tonumber(data.rotation) or 0.0,
+        coords = data.coords,
+        size = data.size,
+        usePoly = false,
+        showBlip = data.showBlip == true,
+        job = sanitizeOptionalText(data.job),
+        gang = sanitizeOptionalText(data.gang)
+    })
+    cb({ success = true })
+end)
+
+RegisterNUICallback("internal_menu_store_delete_submit", function(data, cb)
+    if not data or not data.id then
+        cb({ success = false, reason = "missing_id" })
+        return
+    end
+
+    TriggerServerEvent("illenium-appearance:server:deleteStore", data.id)
+    cb({ success = true })
+end)
 
 local function LoadPlayerUniform(reset)
     if reset then
@@ -174,6 +493,11 @@ end
 RegisterNetEvent("illenium-appearance:client:openClothingShop", OpenClothingShop)
 
 RegisterNetEvent("illenium-appearance:client:importOutfitCode", function()
+    if shouldUseInternalMenu() then
+        openInternalImportForm()
+        return
+    end
+
     local response = lib.inputDialog(_L("outfits.import.title"), {
         {
             type = "input",
@@ -229,6 +553,12 @@ RegisterNetEvent("illenium-appearance:client:generateOutfitCode", function(id)
             })
             return
         end
+
+        if shouldUseInternalMenu() then
+            openInternalGeneratedCodeForm(code)
+            return
+        end
+
         lib.setClipboard(code)
         lib.inputDialog(_L("outfits.generate.success.title"), {
             {
@@ -242,6 +572,11 @@ RegisterNetEvent("illenium-appearance:client:generateOutfitCode", function(id)
 end)
 
 RegisterNetEvent("illenium-appearance:client:saveOutfit", function()
+    if shouldUseInternalMenu() then
+        openInternalSaveForm()
+        return
+    end
+
     local response = lib.inputDialog(_L("outfits.save.title"), {
         {
             type = "input",
@@ -343,6 +678,10 @@ local function RegisterChangeOutfitMenu(id, parent, outfits, mType)
         return a.title < b.title
     end)
 
+    if shouldUseInternalMenu() then
+        return changeOutfitMenu
+    end
+
     lib.registerContext(changeOutfitMenu)
 end
 
@@ -366,6 +705,10 @@ local function RegisterUpdateOutfitMenu(id, parent, outfits)
         return a.title < b.title
     end)
 
+    if shouldUseInternalMenu() then
+        return updateOutfitMenu
+    end
+
     lib.registerContext(updateOutfitMenu)
 end
 
@@ -383,6 +726,10 @@ local function RegisterGenerateOutfitCodeMenu(id, parent, outfits)
             event = "illenium-appearance:client:generateOutfitCode",
             args = outfits[i].id
         }
+    end
+
+    if shouldUseInternalMenu() then
+        return generateOutfitCodeMenu
     end
 
     lib.registerContext(generateOutfitCodeMenu)
@@ -409,6 +756,10 @@ local function RegisterDeleteOutfitMenu(id, parent, outfits, deleteEvent)
         }
     end
 
+    if shouldUseInternalMenu() then
+        return deleteOutfitMenu
+    end
+
     lib.registerContext(deleteOutfitMenu)
 end
 
@@ -418,8 +769,8 @@ RegisterNetEvent("illenium-appearance:client:OutfitManagementMenu", function(arg
     local changeManagementOutfitMenuID = "illenium_appearance_change_management_outfit_menu"
     local deleteManagementOutfitMenuID = "illenium_appearance_delete_management_outfit_menu"
 
-    RegisterChangeOutfitMenu(changeManagementOutfitMenuID, managementMenuID, outfits, args.type)
-    RegisterDeleteOutfitMenu(deleteManagementOutfitMenuID, managementMenuID, outfits, "illenium-appearance:client:DeleteManagementOutfit")
+    local changeManagementMenu = RegisterChangeOutfitMenu(changeManagementOutfitMenuID, managementMenuID, outfits, args.type)
+    local deleteManagementMenu = RegisterDeleteOutfitMenu(deleteManagementOutfitMenuID, managementMenuID, outfits, "illenium-appearance:client:DeleteManagementOutfit")
     local managementMenu = {
         id = managementMenuID,
         title = string.format(_L("outfits.manage.title"), args.type),
@@ -444,6 +795,17 @@ RegisterNetEvent("illenium-appearance:client:OutfitManagementMenu", function(arg
     }
 
     Management.AddBackMenuItem(managementMenu, args)
+
+    if shouldUseInternalMenu() then
+        local menuRegistry = {
+            [managementMenu.id] = managementMenu
+        }
+        if changeManagementMenu then menuRegistry[changeManagementMenu.id] = changeManagementMenu end
+        if deleteManagementMenu then menuRegistry[deleteManagementMenu.id] = deleteManagementMenu end
+
+        openInternalMenu(managementMenuID, menuRegistry)
+        return
+    end
 
     lib.registerContext(managementMenu)
     lib.showContext(managementMenuID)
@@ -528,6 +890,10 @@ local function RegisterWorkOutfitsListMenu(id, parent, menuData)
             }
         end
     end
+    if shouldUseInternalMenu() then
+        return menu
+    end
+
     lib.registerContext(menu)
 end
 
@@ -543,11 +909,12 @@ function OpenMenu(isPedMenu, menuType, menuData)
     local updateOutfitMenuID = "illenium_appearance_update_outfit_menu"
     local deleteOutfitMenuID = "illenium_appearance_delete_outfit_menu"
     local generateOutfitCodeMenuID = "illenium_appearance_generate_outfit_code_menu"
+    local workOutfitsMenu
 
-    RegisterChangeOutfitMenu(changeOutfitMenuID, mainMenuID, outfits)
-    RegisterUpdateOutfitMenu(updateOutfitMenuID, mainMenuID, outfits)
-    RegisterDeleteOutfitMenu(deleteOutfitMenuID, mainMenuID, outfits, "illenium-appearance:client:deleteOutfit")
-    RegisterGenerateOutfitCodeMenu(generateOutfitCodeMenuID, mainMenuID, outfits)
+    local changeMenu = RegisterChangeOutfitMenu(changeOutfitMenuID, mainMenuID, outfits)
+    local updateMenu = RegisterUpdateOutfitMenu(updateOutfitMenuID, mainMenuID, outfits)
+    local deleteMenu = RegisterDeleteOutfitMenu(deleteOutfitMenuID, mainMenuID, outfits, "illenium-appearance:client:deleteOutfit")
+    local generateMenu = RegisterGenerateOutfitCodeMenu(generateOutfitCodeMenuID, mainMenuID, outfits)
     local outfitMenuItems = {
         {
             title = _L("outfits.change.title"),
@@ -610,7 +977,7 @@ function OpenMenu(isPedMenu, menuType, menuData)
         }
 
         local workOutfitsMenuID = "illenium_appearance_work_outfits_menu"
-        RegisterWorkOutfitsListMenu(workOutfitsMenuID, mainMenuID, menuData)
+        workOutfitsMenu = RegisterWorkOutfitsListMenu(workOutfitsMenuID, mainMenuID, menuData)
 
         menuItems[#menuItems + 1] = {
             title = _L("jobOutfits.title"),
@@ -619,6 +986,20 @@ function OpenMenu(isPedMenu, menuType, menuData)
         }
     end
     mainMenu.options = menuItems
+
+    if shouldUseInternalMenu() then
+        local menuRegistry = {
+            [mainMenu.id] = mainMenu
+        }
+        if changeMenu then menuRegistry[changeMenu.id] = changeMenu end
+        if updateMenu then menuRegistry[updateMenu.id] = updateMenu end
+        if deleteMenu then menuRegistry[deleteMenu.id] = deleteMenu end
+        if generateMenu then menuRegistry[generateMenu.id] = generateMenu end
+        if workOutfitsMenu then menuRegistry[workOutfitsMenu.id] = workOutfitsMenu end
+
+        openInternalMenu(mainMenuID, menuRegistry)
+        return
+    end
 
     lib.registerContext(mainMenu)
     lib.showContext(mainMenuID)

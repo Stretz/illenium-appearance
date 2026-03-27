@@ -8,6 +8,30 @@ local TargetPeds = {
 
 Target = {}
 
+local function normalizeStores(stores)
+    local normalized = {}
+    for i = 1, #stores do
+        local s = stores[i]
+        local store = s
+        if type(s.coords) == "table" then
+            store.coords = vector4(s.coords.x or 0.0, s.coords.y or 0.0, s.coords.z or 0.0, s.coords.w or s.rotation or 0.0)
+        end
+        if type(s.size) == "table" then
+            store.size = vector3(s.size.x or 4.0, s.size.y or 4.0, s.size.z or 4.0)
+        end
+        if type(s.points) == "table" then
+            local points = {}
+            for p = 1, #s.points do
+                local pt = s.points[p]
+                points[#points + 1] = vector3(pt.x or 0.0, pt.y or 0.0, pt.z or 0.0)
+            end
+            store.points = points
+        end
+        normalized[#normalized + 1] = store
+    end
+    return normalized
+end
+
 function Target.IsOX()
     return GetResourceState("ox_target") ~= "missing"
 end
@@ -185,8 +209,29 @@ local function SetupTargets()
     SetupPlayerOutfitRoomTargets()
 end
 
+local function RefreshTargets()
+    RemoveTargets()
+    TargetPeds.Store = {}
+    TargetPeds.ClothingRoom = {}
+    TargetPeds.PlayerOutfitRoom = {}
+    SetupTargets()
+end
+
 CreateThread(function()
     if Config.UseTarget then
+        local stores = lib.callback.await("illenium-appearance:server:getStores", false)
+        if stores then
+            Config.Stores = normalizeStores(stores)
+        end
         SetupTargets()
     end
+end)
+
+RegisterNetEvent("illenium-appearance:client:syncStores", function(stores)
+    if not stores then return end
+    Config.Stores = normalizeStores(stores)
+    if Config.UseTarget and Target.IsTargetStarted() then
+        RefreshTargets()
+    end
+    ResetBlips()
 end)
