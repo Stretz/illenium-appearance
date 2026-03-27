@@ -1,4 +1,4 @@
-# Illenium-appearance | Rework / Overhaul
+# Illenium-appearance | Rework / Overhaul | By WSS-Developments - zStretz
 
 A replacement for clothing resources for various frameworks
 
